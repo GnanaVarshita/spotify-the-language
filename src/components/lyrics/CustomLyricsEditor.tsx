@@ -8,6 +8,7 @@ interface CustomLyricsEditorProps {
   initialTransInput: string;
   videoDuration: number;
   isBlurred: boolean;
+  mobileFullscreen?: boolean;
   onApply: (aligned: LyricsLine[]) => void;
   onCancel: () => void;
 }
@@ -17,6 +18,7 @@ export const CustomLyricsEditor: React.FC<CustomLyricsEditorProps> = ({
   initialTransInput,
   videoDuration,
   isBlurred,
+  mobileFullscreen = false,
   onApply,
   onCancel,
 }) => {
@@ -67,8 +69,10 @@ export const CustomLyricsEditor: React.FC<CustomLyricsEditorProps> = ({
     onApply(aligned);
   };
 
+  const panelHeight = mobileFullscreen ? '100%' : (isBlurred ? '600px' : '520px');
+
   return (
-    <Paper className="glass-panel" sx={{ p: 3, height: isBlurred ? '600px' : '520px', overflowY: 'auto' }}>
+    <Paper className="glass-panel" sx={{ p: 3, height: panelHeight, overflowY: 'auto' }}>
       <Typography variant="h6" sx={{ fontWeight: 700, fontFamily: 'Outfit', mb: 1 }}>
         Import Custom Lyrics
       </Typography>

@@ -199,3 +199,61 @@
 .floating-effect {
   animation: float 4s ease-in-out infinite;
 }
+
+/* ================================================
+   Mobile Responsive Overrides (≤ 900px)
+================================================ */
+@media (max-width: 900px) {
+  /* Stack lyrics columns vertically: original on top, translation below */
+  .lyrics-line {
+    flex-direction: column !important;
+    padding: 10px 14px !important;
+    gap: 4px;
+  }
+
+  .original-text {
+    padding-right: 0 !important;
+    padding-bottom: 5px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    font-size: 1rem;
+  }
+
+  .translation-text {
+    border-left: none !important;
+    padding-left: 0 !important;
+    font-size: 0.85rem !important;
+    opacity: 0.75;
+  }
+
+  /* Suppress horizontal slide/scale animations — feels wrong on touch */
+  .lyrics-line:hover {
+    transform: none !important;
+  }
+
+  .lyrics-line.active {
+    transform: none !important;
+    background-color: rgba(56, 189, 248, 0.1) !important;
+  }
+
+  /* Compact lyrics container on mobile */
+  .lyrics-container {
+    padding: 10px !important;
+  }
+}
+
+/* Mobile fullscreen lyrics panel — fills the overlay perfectly */
+.lyrics-panel-fullscreen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Override the inline height on the inner scroller when in fullscreen */
+.lyrics-panel-fullscreen .lyrics-container {
+  flex: 1 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  border-radius: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
+}

@@ -17,6 +17,7 @@ interface LyricsPanelProps {
   currentTime: number;
   isBlurred: boolean;
   loading: boolean;
+  mobileFullscreen?: boolean;
   onLineClick: (time: number) => void;
   targetLanguageName?: string;
   onCustomLyricsLoad: (cues: LyricsLine[]) => void;
@@ -28,6 +29,7 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
   currentTime,
   isBlurred,
   loading,
+  mobileFullscreen = false,
   onLineClick,
   targetLanguageName = 'Target Language',
   onCustomLyricsLoad,
@@ -53,12 +55,16 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
     }
   }, [activeIndex]);
 
+  // Height helpers — fullscreen on mobile fills the flex overlay container
+  const panelH = mobileFullscreen ? '100%' : (isBlurred ? '600px' : '520px');
+  const scrollerH = mobileFullscreen ? undefined : (isBlurred ? '580px' : '520px');
+
   if (loading) {
     return (
       <Paper 
         className="glass-panel" 
         sx={{ 
-          height: isBlurred ? '600px' : '520px', 
+          height: panelH, 
           display: 'flex', 
           flexDirection: 'column', 
           alignItems: 'center', 
@@ -83,6 +89,7 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
         initialTransInput={lyrics.map(l => l.translation).join('\n')}
         videoDuration={videoDuration}
         isBlurred={isBlurred}
+        mobileFullscreen={mobileFullscreen}
         onApply={(aligned) => {
           onCustomLyricsLoad(aligned);
           setIsEditing(false);
@@ -98,7 +105,7 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
       <Paper 
         className="glass-panel" 
         sx={{ 
-          height: isBlurred ? '600px' : '520px', 
+          height: panelH, 
           display: 'flex', 
           flexDirection: 'column', 
           alignItems: 'center', 
@@ -133,7 +140,7 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
   }
 
   return (
-    <Box sx={{ width: '100%' }}>
+    <Box className={mobileFullscreen ? 'lyrics-panel-fullscreen' : ''} sx={{ width: '100%' }}>
       {/* Panel Headers */}
       <Stack 
         direction="row" 
@@ -187,8 +194,8 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
         ref={containerRef} 
         className="lyrics-container" 
         style={{ 
-          height: isBlurred ? '580px' : '520px',
-          padding: isBlurred ? '32px' : '20px',
+          height: scrollerH,
+          padding: mobileFullscreen ? '16px 12px' : (isBlurred ? '32px' : '20px'),
           transition: 'all 0.4s ease'
         }}
       >
@@ -216,12 +223,13 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
                 {line.text}
               </div>
 
-              {/* Translation Column */}
+              {/* Translation Column — always visible in fullscreen; hidden on desktop non-blur */}
               <div 
                 className="lyrics-column translation-text"
                 style={{ 
                   fontSize: isBlurred ? '1.25rem' : '1rem',
-                  lineHeight: 1.5 
+                  lineHeight: 1.5,
+                  display: (!isBlurred && !mobileFullscreen) ? 'none' : undefined,
                 }}
               >
                 {line.translation}

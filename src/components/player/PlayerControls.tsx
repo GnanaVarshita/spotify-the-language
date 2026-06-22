@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Paper, Stack, Typography, Slider, Tooltip, IconButton, Menu, MenuItem, Button } from '@mui/material';
+import { Paper, Stack, Typography, Slider, Tooltip, IconButton, Menu, MenuItem, Button, useTheme, useMediaQuery } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
@@ -39,6 +39,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onSpeedChange,
   onBlurToggle
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const handleSpeedMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -128,23 +130,25 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           </Tooltip>
 
           {/* Volume Control */}
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', width: 130 }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', width: isMobile ? 'auto' : 130 }}>
             <IconButton onClick={onMuteToggle} sx={{ color: 'text.secondary' }}>
               {isMuted || volume === 0 ? <VolumeMuteIcon /> : <VolumeUpIcon />}
             </IconButton>
-            <Slider
-              size="small"
-              value={isMuted ? 0 : volume}
-              onChange={onVolumeChange}
-              aria-label="Volume"
-              sx={{
-                color: 'text.secondary',
-                '& .MuiSlider-thumb': {
-                  width: 10,
-                  height: 10,
-                }
-              }}
-            />
+            {!isMobile && (
+              <Slider
+                size="small"
+                value={isMuted ? 0 : volume}
+                onChange={onVolumeChange}
+                aria-label="Volume"
+                sx={{
+                  color: 'text.secondary',
+                  '& .MuiSlider-thumb': {
+                    width: 10,
+                    height: 10,
+                  }
+                }}
+              />
+            )}
           </Stack>
         </Stack>
 
@@ -202,12 +206,17 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               borderColor: isBlurred ? 'transparent' : 'rgba(56, 189, 248, 0.4)',
               backgroundColor: isBlurred ? '#0284c7' : 'transparent',
               color: isBlurred ? '#ffffff' : '#38bdf8',
+              px: isMobile ? 1.5 : undefined,
+              minWidth: isMobile ? 'auto' : undefined,
               '&:hover': {
                 backgroundColor: isBlurred ? '#0369a1' : 'rgba(56, 189, 248, 0.06)',
               }
             }}
           >
-            {isBlurred ? "Unblur Video" : "Lyrics Mode"}
+            {isMobile
+              ? (isBlurred ? 'Exit' : 'Lyrics')
+              : (isBlurred ? 'Unblur Video' : 'Lyrics Mode')
+            }
           </Button>
         </Stack>
       </Stack>

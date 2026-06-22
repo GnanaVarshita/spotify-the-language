@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { Container, Grid, Box, Typography, Button, Paper, Breadcrumbs, Link, Alert } from '@mui/material';
+import { Container, Grid, Box, Typography, Button, Paper, Breadcrumbs, Link, Alert, useTheme, useMediaQuery } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LibraryMusicIcon from '@mui/icons-material/LibraryMusic';
 import SearchIcon from '@mui/icons-material/Search';
+import BlurOffIcon from '@mui/icons-material/BlurOff';
 
 import { Header } from './components/Header';
 import { SongSelector } from './components/SongSelector';
@@ -22,6 +23,8 @@ import type { SubtitleCue } from './utils/vttParser';
 import { translateText } from './utils/translator';
 
 export default function App() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [activeSong, setActiveSong] = useState<CuratedSong | null>(null);
   const [activeVideo, setActiveVideo] = useState<PipedVideoResult | null>(null);
   const [isBlurred, setIsBlurred] = useState(false);
@@ -379,18 +382,18 @@ export default function App() {
   const currentArtist = activeSong?.artist || activeVideo?.artist || '';
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#09090b', pb: 8 }}>
+    <Box sx={{ minHeight: '100vh', backgroundColor: '#09090b', pb: { xs: 4, md: 8 } }}>
       <Header 
         onBackToLibrary={handleBackToLibrary} 
         youtubeApiKey={youtubeApiKey}
         onApiKeyChange={handleApiKeyChange}
       />
 
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <Container maxWidth="lg" sx={{ mt: { xs: 2, md: 4 }, px: { xs: 2, md: 3 } }}>
         {/* Navigation Breadcrumbs / Back button */}
         {(activeSong || activeVideo) && (
-          <Box sx={{ mb: 3 }}>
-            <Breadcrumbs aria-label="breadcrumb" sx={{ color: 'text.secondary', mb: 2 }}>
+          <Box sx={{ mb: { xs: 2, md: 3 } }}>
+            <Breadcrumbs aria-label="breadcrumb" sx={{ color: 'text.secondary', mb: 1.5, '& .MuiBreadcrumbs-ol': { flexWrap: 'wrap' } }}>
               <Link
                 underline="hover"
                 color="inherit"
@@ -400,7 +403,7 @@ export default function App() {
                 <LibraryMusicIcon sx={{ fontSize: 16 }} />
                 Library
               </Link>
-              <Typography color="text.primary" sx={{ fontWeight: 600 }}>
+              <Typography color="text.primary" sx={{ fontWeight: 600, maxWidth: { xs: '160px', md: 'none' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {currentTitle}
               </Typography>
             </Breadcrumbs>
@@ -409,6 +412,7 @@ export default function App() {
               variant="outlined" 
               onClick={handleBackToLibrary}
               startIcon={<ArrowBackIcon />}
+              size="small"
               sx={{ borderColor: 'rgba(255,255,255,0.08)' }}
             >
               Back to Library
@@ -455,7 +459,7 @@ export default function App() {
 
         {/* Video Player + Lyrics Interface */}
         {(activeSong || activeVideo) && (
-          <Grid container spacing={4} sx={{ alignItems: 'flex-start' }}>
+          <Grid container spacing={{ xs: 2, md: 4 }} sx={{ alignItems: 'flex-start' }}>
             {/* Left side: Video details & Player */}
             <Grid size={{ xs: 12, md: isBlurred ? 4 : 7 }} sx={{ transition: 'all 0.4s ease' }}>
               <VideoPlayer
@@ -470,11 +474,11 @@ export default function App() {
                 onVideoIdResolved={handleVideoIdResolved}
               />
               
-              <Box sx={{ mt: 2.5, px: 1 }}>
-                <Typography variant="h5" sx={{ fontWeight: 750, fontFamily: 'Outfit', letterSpacing: '-0.01em', mb: 0.5 }}>
+              <Box sx={{ mt: 2, px: 1 }}>
+                <Typography variant="h5" sx={{ fontWeight: 750, fontFamily: 'Outfit', letterSpacing: '-0.01em', mb: 0.5, fontSize: { xs: '1.15rem', md: '1.5rem' } }}>
                   {currentTitle}
                 </Typography>
-                <Typography variant="subtitle1" sx={{ color: 'text.secondary', fontWeight: 500, mb: 2 }}>
+                <Typography variant="subtitle1" sx={{ color: 'text.secondary', fontWeight: 500, mb: 2, fontSize: { xs: '0.85rem', md: '1rem' } }}>
                   {currentArtist} {alternativeVideoId && '(Alternative Upload playing)'}
                 </Typography>
 
@@ -534,25 +538,112 @@ export default function App() {
               </Box>
             </Grid>
 
-            {/* Right side: Lyrics Highlight Scroller */}
-            <Grid size={{ xs: 12, md: isBlurred ? 8 : 5 }} sx={{ transition: 'all 0.4s ease' }}>
-              <LyricsPanel
-                lyrics={lyrics}
-                currentTime={currentTime}
-                isBlurred={isBlurred}
-                loading={lyricsLoading}
-                onLineClick={handleLineClick}
-                targetLanguageName={targetLanguageName}
-                onCustomLyricsLoad={(newLyrics) => {
-                  setRawLyricsText(null);
-                  setLyrics(newLyrics);
-                }}
-                videoDuration={videoDuration}
-              />
-            </Grid>
+            {/* Right side: Lyrics Highlight Scroller — hidden on mobile when fullscreen overlay is active */}
+            {!(isMobile && isBlurred) && (
+              <Grid size={{ xs: 12, md: isBlurred ? 8 : 5 }} sx={{ transition: 'all 0.4s ease' }}>
+                <LyricsPanel
+                  lyrics={lyrics}
+                  currentTime={currentTime}
+                  isBlurred={isBlurred}
+                  loading={lyricsLoading}
+                  onLineClick={handleLineClick}
+                  targetLanguageName={targetLanguageName}
+                  onCustomLyricsLoad={(newLyrics) => {
+                    setRawLyricsText(null);
+                    setLyrics(newLyrics);
+                  }}
+                  videoDuration={videoDuration}
+                />
+              </Grid>
+            )}
           </Grid>
         )}
       </Container>
+
+      {/* ─────────────────────────────────────────────────────
+          Mobile Fullscreen Lyrics Overlay
+          Activated when user taps "Lyrics" on a phone/tablet.
+          The video keeps playing behind the overlay (audio on).
+      ───────────────────────────────────────────────────── */}
+      {isMobile && isBlurred && (activeSong || activeVideo) && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1300,
+            backgroundColor: '#09090b',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Mini header bar */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 2,
+              py: 1.5,
+              borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
+              backgroundColor: 'rgba(9, 9, 11, 0.97)',
+              backdropFilter: 'blur(12px)',
+              flexShrink: 0,
+              gap: 1,
+            }}
+          >
+            <Box sx={{ overflow: 'hidden', flex: 1 }}>
+              <Typography
+                variant="body2"
+                sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {currentTitle}
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{ color: 'text.secondary', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {currentArtist}
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<BlurOffIcon sx={{ fontSize: 16 }} />}
+              onClick={() => setIsBlurred(false)}
+              sx={{
+                borderColor: 'rgba(56, 189, 248, 0.35)',
+                color: '#38bdf8',
+                fontSize: '0.75rem',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Exit Lyrics
+            </Button>
+          </Box>
+
+          {/* Full-height lyrics panel */}
+          <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <LyricsPanel
+              lyrics={lyrics}
+              currentTime={currentTime}
+              isBlurred={false}
+              mobileFullscreen={true}
+              loading={lyricsLoading}
+              onLineClick={handleLineClick}
+              targetLanguageName={targetLanguageName}
+              onCustomLyricsLoad={(newLyrics) => {
+                setRawLyricsText(null);
+                setLyrics(newLyrics);
+              }}
+              videoDuration={videoDuration}
+            />
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 }
