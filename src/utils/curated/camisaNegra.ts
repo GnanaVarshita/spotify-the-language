@@ -1,0 +1,36 @@
+import type { CuratedSong } from '../curatedSongs';
+
+export const camisaNegra: CuratedSong = {
+  id: 'la-camisa-negra',
+  title: 'La Camisa Negra',
+  artist: 'Juanes',
+  videoId: 'kMNjaB334J4',
+  language: 'es',
+  languageName: 'Spanish',
+  difficulty: 'Medium',
+  thumbnailUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80',
+  lyrics: [
+    { startTime: 0, endTime: 9, text: '(Instrumental Intro)', translation: '(Instrumental Intro)' },
+    { startTime: 9, endTime: 13, text: 'Tengo la camisa negra', translation: 'I have the black shirt' },
+    { startTime: 13, endTime: 17, text: 'Hoy mi amor está de luto', translation: 'Today my love is in mourning' },
+    { startTime: 17, endTime: 21, text: 'Hoy tengo en el alma una pena', translation: 'Today I have a pain in my soul' },
+    { startTime: 21, endTime: 25, text: 'Y es por culpa de tu embrujo', translation: "And it's because of your spell" },
+    { startTime: 25, endTime: 29, text: 'Hoy sé que tú ya no me quieres', translation: "Today I know that you don't love me anymore" },
+    { startTime: 29, endTime: 33, text: 'Y eso es lo que más me hiere', translation: 'And that is what hurts me the most' },
+    { startTime: 33, endTime: 37, text: 'Que tengo la camisa negra', translation: 'That I have the black shirt' },
+    { startTime: 33, endTime: 37, text: 'Que tengo la camisa negra', translation: 'That I have the black shirt' },
+    { startTime: 37, endTime: 41, text: 'Y una pena que me duele', translation: 'And a pain that hurts me' },
+    { startTime: 41, endTime: 45, text: 'Mal parece que solo me quedé', translation: 'It seems bad that I ended up alone' },
+    { startTime: 45, endTime: 49, text: 'Y fue pura todita tu mentira', translation: 'And all of it was pure lie' },
+    { startTime: 49, endTime: 53, text: 'Que maldita mala suerte la mía', translation: 'What cursed bad luck of mine' },
+    { startTime: 53, endTime: 58, text: 'Que aquel día te encontré', translation: 'That I found you on that day' },
+    { startTime: 58, endTime: 62, text: 'Por bebedora del veneno de tu amor', translation: 'By drinking the poison of your love' },
+    { startTime: 62, endTime: 66, text: 'Yo quedé moribundo y lleno de dolor', translation: 'I was left dying and full of pain' },
+    { startTime: 66, endTime: 70, text: 'Respiré de ese humo amargo de tu adiós', translation: 'I breathed that bitter smoke of your goodbye' },
+    { startTime: 70, endTime: 74, text: 'Y desde que te fuiste solo tengo...', translation: 'And since you left I only have...' },
+    { startTime: 74, endTime: 78, text: 'Tengo la camisa negra', translation: 'I have the black shirt' },
+    { startTime: 78, endTime: 82, text: 'Porque negra tengo el alma', translation: 'Because I have a black soul' },
+    { startTime: 82, endTime: 86, text: 'Yo por ti perdí la calma', translation: 'I lost my calm because of you' },
+    { startTime: 86, endTime: 90, text: 'Y casi pierdo hasta mi cama', translation: 'And I almost even lost my bed' },
+  ]
+};
