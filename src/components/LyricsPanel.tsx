@@ -192,7 +192,7 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
       {/* Lyrics Scroller */}
       <div 
         ref={containerRef} 
-        className="lyrics-container" 
+        className={`lyrics-container ${!isBlurred ? 'stacked-lyrics' : ''}`}
         style={{ 
           height: scrollerH,
           padding: mobileFullscreen ? '16px 12px' : (isBlurred ? '32px' : '20px'),
@@ -223,13 +223,12 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
                 {line.text}
               </div>
 
-              {/* Translation Column — always visible in fullscreen; hidden on desktop non-blur */}
+              {/* Translation Column — always visible */}
               <div 
                 className="lyrics-column translation-text"
                 style={{ 
-                  fontSize: isBlurred ? '1.25rem' : '1rem',
+                  fontSize: isBlurred ? '1.25rem' : '0.95rem',
                   lineHeight: 1.5,
-                  display: (!isBlurred && !mobileFullscreen) ? 'none' : undefined,
                 }}
               >
                 {line.translation}

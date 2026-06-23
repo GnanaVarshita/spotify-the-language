@@ -97,6 +97,8 @@ export interface PipedVideoResult {
   artist: string;
   thumbnailUrl: string;
   duration: number; // in seconds
+  isPlaylist?: boolean;
+  videoCount?: number;
 }
 
 export interface SubtitleTrack {
@@ -107,29 +109,101 @@ export interface SubtitleTrack {
 }
 
 /**
- * Searches YouTube videos using Invidious API (CORS-friendly).
+ * Searches YouTube videos and playlists using Invidious API (CORS-friendly).
  */
 export async function searchVideos(query: string): Promise<PipedVideoResult[]> {
   if (!query.trim()) return [];
   
   try {
-    const data = await fetchFromInvidious(`/api/v1/search?q=${encodeURIComponent(query)}&filter=videos`);
+    const data = await fetchFromInvidious(`/api/v1/search?q=${encodeURIComponent(query)}`);
     const results = Array.isArray(data) ? data : [];
     
     return results
-      .filter((item: any) => item.type === 'video')
+      .filter((item: any) => item.type === 'video' || item.type === 'playlist')
+      .map((item: any) => {
+        if (item.type === 'playlist') {
+          const playlistId = item.playlistId || '';
+          return {
+            videoId: `playlist:${playlistId}`,
+            title: item.title || 'Unknown Playlist',
+            artist: item.author || 'YouTube Playlist',
+            thumbnailUrl: item.playlistThumbnail || (item.videos?.[0]?.videoId ? `https://img.youtube.com/vi/${item.videos[0].videoId}/hqdefault.jpg` : 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80'),
+            duration: 0,
+            isPlaylist: true,
+            videoCount: item.videoCount || 0
+          };
+        } else {
+          const videoId = item.videoId || '';
+          return {
+            videoId,
+            title: item.title || 'Unknown Title',
+            artist: item.author || 'Unknown Artist',
+            thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+            duration: item.lengthSeconds || 0,
+          };
+        }
+      });
+  } catch (err) {
+    console.error('Search failed:', err);
+    return [];
+  }
+}
+
+/**
+ * Fetches dynamic search recommendations by querying other songs by the same artist.
+ */
+export async function getRecommendations(artist: string, currentVideoId: string): Promise<PipedVideoResult[]> {
+  if (!artist || artist === 'Unknown Artist' || artist === 'YouTube Uploader') return [];
+  try {
+    const searchQuery = `${artist} songs`;
+    const data = await fetchFromInvidious(`/api/v1/search?q=${encodeURIComponent(searchQuery)}&filter=videos`);
+    const results = Array.isArray(data) ? data : [];
+    
+    return results
+      .filter((item: any) => item.type === 'video' && item.videoId !== currentVideoId)
+      .slice(0, 6)
       .map((item: any) => {
         const videoId = item.videoId || '';
         return {
           videoId,
           title: item.title || 'Unknown Title',
-          artist: item.author || 'Unknown Artist',
+          artist: item.author || artist,
           thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
           duration: item.lengthSeconds || 0,
         };
       });
   } catch (err) {
-    console.error('Search failed:', err);
+    console.error('Failed to fetch recommendations:', err);
+    return [];
+  }
+}
+
+/**
+ * Fetches recommendations using the YouTube Data API key.
+ */
+export async function getYoutubeRecommendations(artist: string, currentVideoId: string, apiKey: string): Promise<PipedVideoResult[]> {
+  if (!artist || artist === 'Unknown Artist' || artist === 'YouTube Uploader') return [];
+  try {
+    const searchQuery = `${artist} songs`;
+    const response = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(searchQuery)}&type=video&maxResults=8&key=${apiKey}`
+    );
+    if (!response.ok) throw new Error(`YouTube API returned status ${response.status}`);
+    const data = await response.json();
+    const items = data.items || [];
+    
+    return items
+      .map((item: any) => ({
+        videoId: item.id.videoId,
+        title: item.snippet.title,
+        artist: item.snippet.channelTitle || artist,
+        thumbnailUrl: item.snippet.thumbnails?.high?.url || `https://img.youtube.com/vi/${item.id.videoId}/hqdefault.jpg`,
+        duration: 0
+      }))
+      .filter((item: any) => item.videoId !== currentVideoId)
+      .slice(0, 6);
+  } catch (err) {
+    console.error('Failed to get YouTube recommendations:', err);
     return [];
   }
 }

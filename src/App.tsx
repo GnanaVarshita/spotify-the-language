@@ -16,7 +16,7 @@ import { HeroCard } from './components/app/HeroCard';
 
 import { curatedSongs } from './utils/curatedSongs';
 import type { CuratedSong } from './utils/curatedSongs';
-import { fetchSubtitleTracks, fetchSubtitleContent, cleanSongInfo, fetchLyricsFromOvh, fetchLyricsFromLrclib } from './utils/pipedApi';
+import { fetchSubtitleTracks, fetchSubtitleContent, cleanSongInfo, fetchLyricsFromOvh, fetchLyricsFromLrclib, getRecommendations, getYoutubeRecommendations } from './utils/pipedApi';
 import type { PipedVideoResult } from './utils/pipedApi';
 import { parseSubtitles, distributePlainTextLyrics, parseLRC } from './utils/vttParser';
 import type { SubtitleCue } from './utils/vttParser';
@@ -54,6 +54,16 @@ export default function App() {
     () => localStorage.getItem('yt_api_key') || ''
   );
 
+  // Active playing track details resolved from YT player (for subtitle and recommendations lookup)
+  const [resolvedVideoTrack, setResolvedVideoTrack] = useState<{ videoId: string; title: string; artist: string; duration?: number } | null>(null);
+  
+  // Recommendations and Autoplay Queue
+  const [recommendations, setRecommendations] = useState<PipedVideoResult[]>([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [autoplayEnabled, setAutoplayEnabled] = useState(true);
+  const [playbackQueue, setPlaybackQueue] = useState<PipedVideoResult[]>([]);
+  const [currentQueueIndex, setCurrentQueueIndex] = useState<number>(-1);
+
   const playerRef = useRef<VideoPlayerRef>(null);
 
   const handleApiKeyChange = (key: string) => {
@@ -84,6 +94,21 @@ export default function App() {
     setLyrics(song.lyrics);
     setRawLyricsText(null); // Curated songs are pre-synchronized
     setTargetLanguageName(song.languageName);
+
+    // Mapped curated songs list for autoplay queue
+    const mapped = curatedSongs.map(s => ({
+      videoId: s.videoId,
+      title: s.title,
+      artist: s.artist,
+      thumbnailUrl: `https://img.youtube.com/vi/${s.videoId}/hqdefault.jpg`,
+      duration: 0
+    }));
+    setPlaybackQueue(mapped);
+    const idx = mapped.findIndex(item => item.videoId === song.videoId);
+    setCurrentQueueIndex(idx);
+    
+    setResolvedVideoTrack({ videoId: song.videoId, title: song.title, artist: song.artist });
+    setRecommendations([]);
   };
 
   const handleSelectSearchVideo = (video: PipedVideoResult) => {
@@ -92,8 +117,9 @@ export default function App() {
       setAlternativeVideoId(video.videoId);
       setHasPlayerError(false);
       setShowAltSearch(false);
+      setResolvedVideoTrack({ videoId: video.videoId, title: activeSong.title, artist: activeSong.artist });
     } else {
-      // Standard search: play search video
+      // Standard search: play search video or playlist
       setActiveSong(null);
       setActiveVideo(video);
       setAlternativeVideoId(null);
@@ -105,23 +131,29 @@ export default function App() {
       setLyrics([]);
       setRawLyricsText(null); // Reset for new video load
       setTargetLanguageName('Original Language');
+
+      if (video.isPlaylist) {
+        setPlaybackQueue([]);
+        setCurrentQueueIndex(-1);
+        setResolvedVideoTrack(null); // Resolves dynamically when player starts playing
+      } else {
+        setPlaybackQueue(searchResults);
+        const idx = searchResults.findIndex(item => item.videoId === video.videoId);
+        setCurrentQueueIndex(idx !== -1 ? idx : 0);
+        setResolvedVideoTrack({ videoId: video.videoId, title: video.title, artist: video.artist, duration: video.duration });
+      }
+      setRecommendations([]);
     }
   };
 
   const handleVideoIdResolved = (videoId: string, title: string, artist: string) => {
-    if (videoId && videoId !== alternativeVideoId && videoId !== activeVideo?.videoId) {
-      if (activeSong) {
-        setAlternativeVideoId(videoId);
-      } else {
-        setAlternativeVideoId(null);
-        setActiveVideo({
-          videoId,
-          title: activeVideo?.title && !activeVideo.videoId.startsWith('search:') ? activeVideo.title : title,
-          artist: activeVideo?.artist && !activeVideo.videoId.startsWith('search:') ? activeVideo.artist : artist,
-          thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-          duration: 0
-        });
-      }
+    const isCurated = !!activeSong;
+    if (videoId && videoId !== resolvedVideoTrack?.videoId) {
+      setResolvedVideoTrack({
+        videoId,
+        title: isCurated ? (activeSong?.title || title) : title,
+        artist: isCurated ? (activeSong?.artist || artist) : artist
+      });
       setHasPlayerError(false);
     }
   };
@@ -129,6 +161,10 @@ export default function App() {
   const handleBackToLibrary = () => {
     setActiveSong(null);
     setActiveVideo(null);
+    setResolvedVideoTrack(null);
+    setRecommendations([]);
+    setPlaybackQueue([]);
+    setCurrentQueueIndex(-1);
     setAlternativeVideoId(null);
     setHasPlayerError(false);
     setShowAltSearch(false);
@@ -138,14 +174,41 @@ export default function App() {
     setVideoDuration(0);
   };
 
+  const handleVideoEnded = () => {
+    if (!autoplayEnabled) return;
+    
+    // YouTube player advances playlists automatically, so we don't interfere
+    if (activeVideo?.isPlaylist) {
+      console.log('Playlist track ended. YouTube player auto-advances.');
+      return;
+    }
+    
+    if (playbackQueue.length > 0 && currentQueueIndex < playbackQueue.length - 1) {
+      const nextIndex = currentQueueIndex + 1;
+      const nextVideo = playbackQueue[nextIndex];
+      setCurrentQueueIndex(nextIndex);
+      
+      if (activeSong) {
+        const matchingCurated = curatedSongs.find(s => s.videoId === nextVideo.videoId);
+        if (matchingCurated) {
+          handleSelectCuratedSong(matchingCurated);
+        }
+      } else {
+        handleSelectSearchVideo(nextVideo);
+      }
+    } else if (recommendations.length > 0) {
+      const topRec = recommendations[0];
+      handleSelectSearchVideo(topRec);
+    }
+  };
 
-  // Load subtitles from Piped API when a searched YouTube video is selected
+  // Load subtitles from API when a resolved video track changes (skipping curated songs)
   useEffect(() => {
-    if (!activeVideo) return;
+    if (!resolvedVideoTrack || activeSong) return;
 
     const loadBackupLyrics = async (): Promise<boolean> => {
       try {
-        const cleaned = cleanSongInfo(activeVideo.title, activeVideo.artist);
+        const cleaned = cleanSongInfo(resolvedVideoTrack.title, resolvedVideoTrack.artist);
         
         let lyricsSource = '';
         let plainLyrics = '';
@@ -190,10 +253,10 @@ export default function App() {
         setTargetLanguageName(`Original (${lyricsSource})`);
 
         if (isSynced) {
-          setRawLyricsText(null); // Synced lyrics already have timestamps, no need to redistribute
+          setRawLyricsText(null);
         } else {
           setRawLyricsText(plainLyrics);
-          const dur = videoDuration || activeVideo.duration || 180;
+          const dur = videoDuration || resolvedVideoTrack.duration || 180;
           plainCues = distributePlainTextLyrics(plainLyrics, dur);
         }
 
@@ -245,7 +308,7 @@ export default function App() {
     const loadSubtitles = async () => {
       setLyricsLoading(true);
       try {
-        const tracks = await fetchSubtitleTracks(activeVideo.videoId);
+        const tracks = await fetchSubtitleTracks(resolvedVideoTrack.videoId);
         
         if (tracks.length === 0) {
           const lyricsFound = await loadBackupLyrics();
@@ -256,8 +319,7 @@ export default function App() {
           return;
         }
 
-        // Find primary non-English track (target language to learn)
-        // If not found, fall back to first track
+        // Find primary non-English track
         let originalTrack = tracks.find(t => t.code !== 'en' && !t.code.startsWith('en'));
         if (!originalTrack) {
           originalTrack = tracks[0];
@@ -265,10 +327,8 @@ export default function App() {
 
         setTargetLanguageName(originalTrack.name || 'Original Language');
 
-        // Look for English translation track
         const englishTrack = tracks.find(t => t.code === 'en' || t.code.startsWith('en'));
 
-        // Fetch original subtitles
         const originalVttText = await fetchSubtitleContent(originalTrack.url);
         const originalCues = parseSubtitles(originalVttText);
 
@@ -281,12 +341,10 @@ export default function App() {
           return;
         }
 
-        // If English track is available, align them
         if (englishTrack && englishTrack.url !== originalTrack.url) {
           const englishVttText = await fetchSubtitleContent(englishTrack.url);
           const englishCues = parseSubtitles(englishVttText);
 
-          // Align English captions with original captions by overlapping timestamps
           const aligned = originalCues.map(orig => {
             const match = englishCues.find(eng => {
               const overlap = Math.min(orig.endTime, eng.endTime) - Math.max(orig.startTime, eng.startTime);
@@ -300,7 +358,6 @@ export default function App() {
             };
           });
 
-          // Check if we need to translate missing lines
           const filled = await Promise.all(
             aligned.map(async line => {
               if (!line.translation) {
@@ -313,8 +370,6 @@ export default function App() {
 
           setLyrics(filled);
         } else {
-          // No English track: Translate the original cues line-by-line using MyMemory API
-          // Translate in batches of 5 to avoid heavy rate limits
           const translatedLines: LyricsLine[] = [];
           const chunkSize = 5;
           const fromCode = originalTrack.code;
@@ -344,7 +399,7 @@ export default function App() {
             translatedLines.push(...resolved);
 
             if (i + chunkSize < originalCues.length) {
-              await new Promise(r => setTimeout(r, 200)); // 200ms delay between batches
+              await new Promise(r => setTimeout(r, 200));
             }
           }
 
@@ -362,7 +417,36 @@ export default function App() {
     };
 
     loadSubtitles();
-  }, [activeVideo]);
+  }, [resolvedVideoTrack]);
+
+  // Load recommendations when active song/video changes
+  useEffect(() => {
+    const track = activeSong || resolvedVideoTrack;
+    if (!track) {
+      setRecommendations([]);
+      return;
+    }
+    
+    const fetchRecs = async () => {
+      setRecommendationsLoading(true);
+      try {
+        let recs: PipedVideoResult[] = [];
+        if (youtubeApiKey) {
+          recs = await getYoutubeRecommendations(track.artist, track.videoId, youtubeApiKey);
+        } else {
+          recs = await getRecommendations(track.artist, track.videoId);
+        }
+        setRecommendations(recs);
+      } catch (err) {
+        console.error('Error fetching recommendations:', err);
+        setRecommendations([]);
+      } finally {
+        setRecommendationsLoading(false);
+      }
+    };
+    
+    fetchRecs();
+  }, [activeSong, resolvedVideoTrack, youtubeApiKey]);
 
   // Redistribute plain-text backup lyrics if the actual video duration becomes available
   useEffect(() => {
@@ -378,8 +462,8 @@ export default function App() {
   }, [videoDuration]);
 
   const currentVideoId = alternativeVideoId || activeSong?.videoId || activeVideo?.videoId || '';
-  const currentTitle = activeSong?.title || activeVideo?.title || '';
-  const currentArtist = activeSong?.artist || activeVideo?.artist || '';
+  const currentTitle = activeSong?.title || resolvedVideoTrack?.title || activeVideo?.title || '';
+  const currentArtist = activeSong?.artist || resolvedVideoTrack?.artist || activeVideo?.artist || '';
 
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: '#09090b', pb: { xs: 4, md: 8 } }}>
@@ -472,6 +556,7 @@ export default function App() {
                 onPlaybackStateChange={() => {}}
                 onPlayerError={() => setHasPlayerError(true)}
                 onVideoIdResolved={handleVideoIdResolved}
+                onVideoEnded={handleVideoEnded}
               />
               
               <Box sx={{ mt: 2, px: 1 }}>
@@ -535,6 +620,123 @@ export default function App() {
                     />
                   </Paper>
                 )}
+
+                {/* Playlist Queue / Recommendations Panel */}
+                <Box sx={{ mt: 4, mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, fontFamily: 'Outfit', fontSize: '1.25rem', color: '#38bdf8' }}>
+                      {activeVideo?.isPlaylist ? "Playlist Queue" : "Recommended Songs"}
+                    </Typography>
+                    
+                    {!activeVideo?.isPlaylist && (
+                      <Button
+                        size="small"
+                        onClick={() => setAutoplayEnabled(!autoplayEnabled)}
+                        sx={{ 
+                          textTransform: 'none', 
+                          fontSize: '0.78rem', 
+                          fontWeight: 600,
+                          color: autoplayEnabled ? '#38bdf8' : 'text.secondary',
+                          borderColor: autoplayEnabled ? 'rgba(56, 189, 248, 0.3)' : 'rgba(255,255,255,0.08)',
+                          '&:hover': {
+                            borderColor: '#38bdf8',
+                            backgroundColor: 'rgba(56, 189, 248, 0.04)'
+                          }
+                        }}
+                        variant="outlined"
+                      >
+                        {autoplayEnabled ? "Auto-play: ON" : "Auto-play: OFF"}
+                      </Button>
+                    )}
+                  </Box>
+
+                  {activeVideo?.isPlaylist ? (
+                    <Paper className="glass-panel" sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5, border: '1px solid rgba(56, 189, 248, 0.15)' }}>
+                      <Box sx={{ color: '#38bdf8', fontSize: '1.2rem', display: 'flex', alignItems: 'center' }}>⚙️</Box>
+                      <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: '0.85rem' }}>
+                        Playing from Playlist. YouTube Player will automatically load and play the next song in the background. Bilingual lyrics scroller will update automatically.
+                      </Typography>
+                    </Paper>
+                  ) : (
+                    <Grid container spacing={2}>
+                      {recommendationsLoading ? (
+                        [1, 2, 3, 4].map((i) => (
+                          <Grid size={{ xs: 12, sm: 6 }} key={i}>
+                            <Paper className="glass-panel" sx={{ p: 1.5, display: 'flex', gap: 1.5, height: 60, alignItems: 'center' }}>
+                              <Box className="shimmer-loading" sx={{ width: 80, height: 45, borderRadius: 1 }} />
+                              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                <Box className="shimmer-loading" sx={{ height: 12, width: '80%', borderRadius: 1 }} />
+                                <Box className="shimmer-loading" sx={{ height: 10, width: '40%', borderRadius: 1 }} />
+                              </Box>
+                            </Paper>
+                          </Grid>
+                        ))
+                      ) : recommendations.length > 0 ? (
+                        recommendations.map((rec) => (
+                          <Grid size={{ xs: 12, sm: 6 }} key={rec.videoId}>
+                            <Paper 
+                              className="glass-panel" 
+                              onClick={() => handleSelectSearchVideo(rec)}
+                              sx={{ 
+                                p: 1.5, 
+                                display: 'flex', 
+                                gap: 1.5, 
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                alignItems: 'center',
+                                '&:hover': {
+                                  borderColor: 'rgba(56, 189, 248, 0.3)',
+                                  backgroundColor: 'rgba(56, 189, 248, 0.02)',
+                                  transform: 'translateY(-2px)'
+                                }
+                              }}
+                            >
+                              <Box 
+                                component="img" 
+                                src={rec.thumbnailUrl} 
+                                alt={rec.title}
+                                sx={{ width: 80, height: 45, objectFit: 'cover', borderRadius: 1 }}
+                              />
+                              <Box sx={{ overflow: 'hidden', flex: 1 }}>
+                                <Typography 
+                                  variant="subtitle2" 
+                                  sx={{ 
+                                    fontWeight: 700, 
+                                    fontSize: '0.82rem',
+                                    whiteSpace: 'nowrap', 
+                                    overflow: 'hidden', 
+                                    textOverflow: 'ellipsis',
+                                    mb: 0.25
+                                  }}
+                                >
+                                  {rec.title}
+                                </Typography>
+                                <Typography 
+                                  variant="caption" 
+                                  sx={{ 
+                                    color: 'text.secondary', 
+                                    display: 'block',
+                                    whiteSpace: 'nowrap', 
+                                    overflow: 'hidden', 
+                                    textOverflow: 'ellipsis' 
+                                  }}
+                                >
+                                  {rec.artist}
+                                </Typography>
+                              </Box>
+                            </Paper>
+                          </Grid>
+                        ))
+                      ) : (
+                        <Grid size={12}>
+                          <Typography variant="body2" sx={{ color: 'text.secondary', pl: 1, fontStyle: 'italic' }}>
+                            No recommendations found for this artist.
+                          </Typography>
+                        </Grid>
+                      )}
+                    </Grid>
+                  )}
+                </Box>
               </Box>
             </Grid>
 

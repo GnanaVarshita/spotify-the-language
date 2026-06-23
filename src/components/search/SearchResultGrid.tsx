@@ -127,22 +127,24 @@ export const SearchResultGrid: React.FC<SearchResultGridProps> = ({
                   </IconButton>
                 </Box>
 
-                {/* Duration Label */}
+                {/* Duration / Playlist Label */}
                 <Box 
                   sx={{ 
                     position: 'absolute', 
                     bottom: 8, 
                     right: 8, 
-                    backgroundColor: 'rgba(9, 9, 11, 0.85)', 
-                    color: '#f4f4f5', 
+                    backgroundColor: video.isPlaylist ? 'rgba(56, 189, 248, 0.95)' : 'rgba(9, 9, 11, 0.85)', 
+                    color: video.isPlaylist ? '#09090b' : '#f4f4f5', 
                     px: 1, 
                     py: 0.25, 
                     borderRadius: '4px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600
+                    fontSize: '0.72rem',
+                    fontWeight: 700
                   }}
                 >
-                  {formatDuration(video.duration)}
+                  {video.isPlaylist 
+                    ? (video.videoCount ? `PLAYLIST • ${video.videoCount} Tracks` : 'PLAYLIST') 
+                    : formatDuration(video.duration)}
                 </Box>
               </Box>
 
@@ -177,6 +179,24 @@ export const SearchResultGrid: React.FC<SearchResultGridProps> = ({
                   >
                     {video.artist}
                   </Typography>
+                  {video.isPlaylist && (
+                    <Box sx={{ mt: 1 }}>
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          color: '#38bdf8', 
+                          fontWeight: 700,
+                          backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                          px: 1,
+                          py: 0.2,
+                          borderRadius: 1,
+                          display: 'inline-block'
+                        }}
+                      >
+                        Playlist
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </CardContent>
             </Card>

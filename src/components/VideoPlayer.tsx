@@ -19,6 +19,7 @@ interface VideoPlayerProps {
   onPlaybackStateChange: (isPlaying: boolean) => void;
   onPlayerError?: (errorCode: number) => void;
   onVideoIdResolved?: (videoId: string, title: string, artist: string) => void;
+  onVideoEnded?: () => void;
 }
 
 export interface VideoPlayerRef {
@@ -34,7 +35,8 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
   onDurationChange,
   onPlaybackStateChange,
   onPlayerError,
-  onVideoIdResolved
+  onVideoIdResolved,
+  onVideoEnded
 }, ref) => {
   const playerRef = useRef<any>(null);
   const containerId = `yt-player-${videoId}`;
@@ -121,6 +123,9 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
             
             if (state === 0) {
               setCurrentTime(0);
+              if (onVideoEnded) {
+                onVideoEnded();
+              }
             }
 
             // Resolve playing video details on play
@@ -176,6 +181,9 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
       if (isSearchQuery) {
         playerConfig.playerVars.listType = 'search';
         playerConfig.playerVars.list = videoId.substring(7);
+      } else if (videoId.startsWith('playlist:')) {
+        playerConfig.playerVars.listType = 'playlist';
+        playerConfig.playerVars.list = videoId.substring(9);
       } else {
         playerConfig.videoId = videoId;
       }

@@ -83,9 +83,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     
     try {
       if (youtubeApiKey) {
-        // Query via YouTube Data API
+        // Query via YouTube Data API (fetching both videos and playlists)
         const response = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(trimmedQuery)}&type=video&maxResults=12&key=${youtubeApiKey}`
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(trimmedQuery)}&type=video,playlist&maxResults=12&key=${youtubeApiKey}`
         );
         if (!response.ok) {
           const errData = await response.json();
@@ -93,13 +93,27 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         }
         const data = await response.json();
         const items = data.items || [];
-        const mappedResults = items.map((item: any) => ({
-          videoId: item.id.videoId,
-          title: item.snippet.title,
-          artist: item.snippet.channelTitle,
-          thumbnailUrl: item.snippet.thumbnails?.high?.url || `https://img.youtube.com/vi/${item.id.videoId}/hqdefault.jpg`,
-          duration: 0
-        }));
+        const mappedResults = items.map((item: any) => {
+          if (item.id.kind === 'youtube#playlist') {
+            return {
+              videoId: `playlist:${item.id.playlistId}`,
+              title: item.snippet.title,
+              artist: item.snippet.channelTitle || 'YouTube Playlist',
+              thumbnailUrl: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80',
+              duration: 0,
+              isPlaylist: true,
+              videoCount: 0
+            };
+          } else {
+            return {
+              videoId: item.id.videoId,
+              title: item.snippet.title,
+              artist: item.snippet.channelTitle,
+              thumbnailUrl: item.snippet.thumbnails?.high?.url || `https://img.youtube.com/vi/${item.id.videoId}/hqdefault.jpg`,
+              duration: 0
+            };
+          }
+        });
         setResults(mappedResults);
       } else {
         // Query via Invidious API
