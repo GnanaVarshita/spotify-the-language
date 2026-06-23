@@ -73,7 +73,7 @@ export const Header: React.FC<HeaderProps> = ({ onBackToLibrary, youtubeApiKey, 
                 fontFamily: 'Outfit'
               }}
             >
-             Spotify the Language
+            LyriLingo
             </Typography>
           </Box>
 
