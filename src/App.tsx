@@ -64,6 +64,17 @@ export default function App() {
   const [playbackQueue, setPlaybackQueue] = useState<PipedVideoResult[]>([]);
   const [currentQueueIndex, setCurrentQueueIndex] = useState<number>(-1);
 
+  // Recently Played History
+  const [recentlyPlayed, setRecentlyPlayed] = useState<PipedVideoResult[]>(() => {
+    try {
+      const saved = localStorage.getItem('recently_played');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error('Failed to load recently played history:', e);
+      return [];
+    }
+  });
+
   const playerRef = useRef<VideoPlayerRef>(null);
 
   const handleApiKeyChange = (key: string) => {
@@ -448,6 +459,36 @@ export default function App() {
     fetchRecs();
   }, [activeSong, resolvedVideoTrack, youtubeApiKey]);
 
+  // Save playing tracks to Recently Played history
+  useEffect(() => {
+    if (!resolvedVideoTrack) return;
+    
+    const { videoId, title, artist } = resolvedVideoTrack;
+    if (!videoId || !title || title === 'Custom YouTube Video' || title === 'Loaded Video') return;
+    
+    setRecentlyPlayed((prev) => {
+      const filtered = prev.filter((item) => item.videoId !== videoId);
+      
+      const newTrack: PipedVideoResult = {
+        videoId,
+        title,
+        artist: artist || 'Unknown Artist',
+        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+        duration: resolvedVideoTrack.duration || 0
+      };
+      
+      const updated = [newTrack, ...filtered].slice(0, 8); // Keep last 8 played items
+      
+      try {
+        localStorage.setItem('recently_played', JSON.stringify(updated));
+      } catch (e) {
+        console.error('Failed to save recently played history:', e);
+      }
+      
+      return updated;
+    });
+  }, [resolvedVideoTrack]);
+
   // Redistribute plain-text backup lyrics if the actual video duration becomes available
   useEffect(() => {
     if (videoDuration > 0 && lyrics.length > 0 && rawLyricsText) {
@@ -514,6 +555,82 @@ export default function App() {
               songs={curatedSongs} 
               onSelectSong={handleSelectCuratedSong} 
             />
+
+            {/* Recently Played History Shelf */}
+            {recentlyPlayed.length > 0 && (
+              <Box sx={{ mt: 6 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1 }}>
+                  <Box sx={{ width: 4, height: 24, backgroundColor: '#38bdf8', borderRadius: 2 }} />
+                  <Typography variant="h5" sx={{ fontWeight: 700, fontFamily: 'Outfit', letterSpacing: '-0.02em' }}>
+                    Recently Played
+                  </Typography>
+                </Box>
+                <Grid container spacing={2}>
+                  {recentlyPlayed.map((video) => (
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }} key={video.videoId}>
+                      <Paper
+                        onClick={() => handleSelectSearchVideo(video)}
+                        className="glass-panel"
+                        sx={{
+                          p: 1.5,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 2,
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                          '&:hover': {
+                            borderColor: 'rgba(56, 189, 248, 0.35)',
+                            backgroundColor: 'rgba(56, 189, 248, 0.03)',
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                      >
+                        <Box
+                          component="img"
+                          src={video.thumbnailUrl}
+                          alt={video.title}
+                          sx={{
+                            width: 64,
+                            height: 48,
+                            objectFit: 'cover',
+                            borderRadius: 1,
+                            flexShrink: 0
+                          }}
+                        />
+                        <Box sx={{ overflow: 'hidden', flexGrow: 1 }}>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                              lineHeight: 1.25,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              mb: 0.25
+                            }}
+                          >
+                            {video.title}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: 'text.secondary',
+                              display: 'block',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}
+                          >
+                            {video.artist}
+                          </Typography>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            )}
 
             <Box sx={{ my: 6, borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }} />
 

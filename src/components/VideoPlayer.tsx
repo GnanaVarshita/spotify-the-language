@@ -128,8 +128,8 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({
               }
             }
 
-            // Resolve playing video details on play
-            if (playing && onVideoIdResolved) {
+            // Resolve playing video details on state changes (so lyrics load even if paused/buffering)
+            if (onVideoIdResolved) {
               try {
                 const player = event.target;
                 let resolvedId = '';
