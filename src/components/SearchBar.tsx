@@ -17,6 +17,7 @@ interface SearchBarProps {
   onSearchedChange?: (s: boolean) => void;
   persistedErrorMsg?: string | null;
   onErrorMsgChange?: (err: string | null) => void;
+  learningLanguage?: string;
 }
 
 // Utility to extract Video ID from YouTube links
@@ -36,7 +37,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   persistedSearched,
   onSearchedChange,
   persistedErrorMsg,
-  onErrorMsgChange
+  onErrorMsgChange,
+  learningLanguage
 }) => {
   const [localQuery, setLocalQuery] = useState('');
   const [localResults, setLocalResults] = useState<PipedVideoResult[]>([]);
@@ -78,6 +80,15 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       return;
     }
 
+    // Append language filter if active and not already present in the query (case-insensitive)
+    let apiQuery = trimmedQuery;
+    if (learningLanguage && learningLanguage !== 'Any') {
+      const langLower = learningLanguage.toLowerCase();
+      if (!trimmedQuery.toLowerCase().includes(langLower)) {
+        apiQuery = `${trimmedQuery} ${learningLanguage}`;
+      }
+    }
+
     setLoading(true);
     setSearched(true);
     
@@ -85,7 +96,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       if (youtubeApiKey) {
         // Query via YouTube Data API (fetching both videos and playlists)
         const response = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(trimmedQuery)}&type=video,playlist&maxResults=12&key=${youtubeApiKey}`
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(apiQuery)}&type=video,playlist&maxResults=12&key=${youtubeApiKey}`
         );
         if (!response.ok) {
           const errData = await response.json();
@@ -117,7 +128,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         setResults(mappedResults);
       } else {
         // Query via Invidious API
-        const videoResults = await searchVideos(trimmedQuery);
+        const videoResults = await searchVideos(apiQuery);
         if (videoResults.length === 0) {
           setErrorMsg('All public search proxies are currently rate-limited. Click "Instant Play" below to play the song immediately!');
         }
@@ -136,9 +147,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     const trimmedQuery = query.trim();
     if (!trimmedQuery) return;
 
+    let playQuery = trimmedQuery;
+    if (learningLanguage && learningLanguage !== 'Any') {
+      const langLower = learningLanguage.toLowerCase();
+      if (!trimmedQuery.toLowerCase().includes(langLower)) {
+        playQuery = `${trimmedQuery} ${learningLanguage}`;
+      }
+    }
+
     onSelectVideo({
-      videoId: `search:${trimmedQuery}`,
-      title: trimmedQuery,
+      videoId: `search:${playQuery}`,
+      title: playQuery,
       artist: 'Direct YouTube Playback',
       thumbnailUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&q=80',
       duration: 0

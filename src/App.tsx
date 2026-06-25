@@ -6,7 +6,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import BlurOffIcon from '@mui/icons-material/BlurOff';
 
 import { Header } from './components/Header';
-import { SongSelector } from './components/SongSelector';
 import { SearchBar } from './components/SearchBar';
 import { VideoPlayer } from './components/VideoPlayer';
 import type { VideoPlayerRef } from './components/VideoPlayer';
@@ -76,6 +75,16 @@ export default function App() {
   });
 
   const playerRef = useRef<VideoPlayerRef>(null);
+
+  // Load Learning Language Filter from LocalStorage
+  const [learningLanguage, setLearningLanguage] = useState<string>(
+    () => localStorage.getItem('learning_language') || 'Any'
+  );
+
+  const handleLanguageChange = (lang: string) => {
+    setLearningLanguage(lang);
+    localStorage.setItem('learning_language', lang);
+  };
 
   const handleApiKeyChange = (key: string) => {
     setYoutubeApiKey(key);
@@ -430,7 +439,7 @@ export default function App() {
     loadSubtitles();
   }, [resolvedVideoTrack]);
 
-  // Load recommendations when active song/video changes
+  // Load recommendations when active song/video changes or learning language changes
   useEffect(() => {
     const track = activeSong || resolvedVideoTrack;
     if (!track) {
@@ -443,9 +452,9 @@ export default function App() {
       try {
         let recs: PipedVideoResult[] = [];
         if (youtubeApiKey) {
-          recs = await getYoutubeRecommendations(track.artist, track.videoId, youtubeApiKey);
+          recs = await getYoutubeRecommendations(track.artist, track.videoId, youtubeApiKey, learningLanguage);
         } else {
-          recs = await getRecommendations(track.artist, track.videoId);
+          recs = await getRecommendations(track.artist, track.videoId, learningLanguage);
         }
         setRecommendations(recs);
       } catch (err) {
@@ -457,7 +466,7 @@ export default function App() {
     };
     
     fetchRecs();
-  }, [activeSong, resolvedVideoTrack, youtubeApiKey]);
+  }, [activeSong, resolvedVideoTrack, youtubeApiKey, learningLanguage]);
 
   // Save playing tracks to Recently Played history
   useEffect(() => {
@@ -512,6 +521,8 @@ export default function App() {
         onBackToLibrary={handleBackToLibrary} 
         youtubeApiKey={youtubeApiKey}
         onApiKeyChange={handleApiKeyChange}
+        learningLanguage={learningLanguage}
+        onLanguageChange={handleLanguageChange}
       />
 
       <Container maxWidth="lg" sx={{ mt: { xs: 2, md: 4 }, px: { xs: 2, md: 3 } }}>
@@ -545,20 +556,35 @@ export default function App() {
           </Box>
         )}
 
-        {/* Dashboard: Curated Songs + Search */}
+        {/* Dashboard: Search, History, and Hero Description */}
         {!activeSong && !activeVideo && (
           <Box>
-            <HeroCard />
+            {/* YouTube Video Search (Top) */}
+            <Box sx={{ mb: 6 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1 }}>
+                <Box sx={{ width: 4, height: 24, backgroundColor: '#38bdf8', borderRadius: 2 }} />
+                <Typography variant="h5" sx={{ fontWeight: 700, fontFamily: 'Outfit', letterSpacing: '-0.02em' }}>
+                  Search and Learn Any Video
+                </Typography>
+              </Box>
+              <SearchBar 
+                onSelectVideo={handleSelectSearchVideo} 
+                youtubeApiKey={youtubeApiKey} 
+                persistedQuery={searchQuery}
+                onQueryChange={setSearchQuery}
+                persistedResults={searchResults}
+                onResultsChange={setSearchResults}
+                persistedSearched={searchSearched}
+                onSearchedChange={setSearchSearched}
+                persistedErrorMsg={searchErrorMsg}
+                onErrorMsgChange={setSearchErrorMsg}
+                learningLanguage={learningLanguage}
+              />
+            </Box>
 
-            {/* Song Library Selector */}
-            <SongSelector 
-              songs={curatedSongs} 
-              onSelectSong={handleSelectCuratedSong} 
-            />
-
-            {/* Recently Played History Shelf */}
+            {/* Recently Played History Shelf (Middle) */}
             {recentlyPlayed.length > 0 && (
-              <Box sx={{ mt: 6 }}>
+              <Box sx={{ mb: 6 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1 }}>
                   <Box sx={{ width: 4, height: 24, backgroundColor: '#38bdf8', borderRadius: 2 }} />
                   <Typography variant="h5" sx={{ fontWeight: 700, fontFamily: 'Outfit', letterSpacing: '-0.02em' }}>
@@ -632,29 +658,11 @@ export default function App() {
               </Box>
             )}
 
+            {/* Divider between interactive features and help card */}
             <Box sx={{ my: 6, borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }} />
 
-            {/* YouTube Video Search */}
-            <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1 }}>
-                <Box sx={{ width: 4, height: 24, backgroundColor: '#38bdf8', borderRadius: 2 }} />
-                <Typography variant="h5" sx={{ fontWeight: 700, fontFamily: 'Outfit', letterSpacing: '-0.02em' }}>
-                  Search and Learn Any Video
-                </Typography>
-              </Box>
-              <SearchBar 
-                onSelectVideo={handleSelectSearchVideo} 
-                youtubeApiKey={youtubeApiKey} 
-                persistedQuery={searchQuery}
-                onQueryChange={setSearchQuery}
-                persistedResults={searchResults}
-                onResultsChange={setSearchResults}
-                persistedSearched={searchSearched}
-                onSearchedChange={setSearchSearched}
-                persistedErrorMsg={searchErrorMsg}
-                onErrorMsgChange={setSearchErrorMsg}
-              />
-            </Box>
+            {/* Hero Card / Description (Bottom) */}
+            <HeroCard />
           </Box>
         )}
 
@@ -734,6 +742,7 @@ export default function App() {
                     <SearchBar 
                       onSelectVideo={handleSelectSearchVideo} 
                       youtubeApiKey={youtubeApiKey} 
+                      learningLanguage={learningLanguage}
                     />
                   </Paper>
                 )}

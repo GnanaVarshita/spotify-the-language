@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { AppBar, Toolbar, Typography, Box, Container, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, TextField, Tooltip, Stack } from '@mui/material';
+import { AppBar, Toolbar, Typography, Box, Container, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, TextField, Tooltip, Stack, FormControl, Select, MenuItem } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import TranslateIcon from '@mui/icons-material/Translate';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -8,9 +9,27 @@ interface HeaderProps {
   onBackToLibrary?: () => void;
   youtubeApiKey: string;
   onApiKeyChange: (key: string) => void;
+  learningLanguage: string;
+  onLanguageChange: (lang: string) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onBackToLibrary, youtubeApiKey, onApiKeyChange }) => {
+const LANGUAGES = [
+  'Any',
+  'Spanish',
+  'French',
+  'German',
+  'Italian',
+  'Portuguese',
+  'Japanese'
+];
+
+export const Header: React.FC<HeaderProps> = ({ 
+  onBackToLibrary, 
+  youtubeApiKey, 
+  onApiKeyChange,
+  learningLanguage,
+  onLanguageChange
+}) => {
   const [openSettings, setOpenSettings] = useState(false);
   const [keyInput, setKeyInput] = useState(youtubeApiKey);
 
@@ -79,20 +98,89 @@ export const Header: React.FC<HeaderProps> = ({ onBackToLibrary, youtubeApiKey, 
 
           {/* Right Header Navigation */}
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TranslateIcon sx={{ color: '#38bdf8', fontSize: 18 }} />
-              <Typography 
-                variant="body2" 
-                sx={{ 
-                  color: 'text.secondary', 
-                  fontWeight: 500,
-                  display: { xs: 'none', sm: 'block' },
-                  fontSize: '0.85rem'
+            {/* Learning Language Selector */}
+            <FormControl size="small" sx={{ 
+              minWidth: { xs: 120, sm: 160 },
+              '& .MuiOutlinedInput-root': {
+                color: '#38bdf8',
+                fontFamily: 'Outfit',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                backgroundColor: 'rgba(56, 189, 248, 0.03)',
+                borderColor: 'rgba(56, 189, 248, 0.2)',
+                borderRadius: '8px',
+                transition: 'all 0.25s ease',
+                '&:hover': {
+                  borderColor: 'rgba(56, 189, 248, 0.4)',
+                  backgroundColor: 'rgba(56, 189, 248, 0.06)',
+                },
+                '&.Mui-focused': {
+                  boxShadow: '0 0 12px rgba(56, 189, 248, 0.25)',
+                  borderColor: '#38bdf8',
+                },
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(56, 189, 248, 0.15)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(56, 189, 248, 0.3)',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#38bdf8',
+                }
+              },
+              '& .MuiSelect-icon': {
+                color: '#38bdf8',
+              }
+            }}>
+              <Select
+                value={learningLanguage}
+                onChange={(e: SelectChangeEvent<string>) => onLanguageChange?.(e.target.value as string)}
+                displayEmpty
+                renderValue={(selected: any) => (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <TranslateIcon sx={{ fontSize: 16 }} />
+                    <span>{selected === 'Any' ? 'Any Language' : selected}</span>
+                  </Box>
+                )}
+                MenuProps={{
+                  slotProps: {
+                    paper: {
+                      sx: {
+                        backgroundColor: '#18181b',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '8px',
+                        mt: 0.5,
+                        '& .MuiMenuItem-root': {
+                          color: 'text.secondary',
+                          fontFamily: 'Outfit',
+                          fontSize: '0.85rem',
+                          fontWeight: 500,
+                          py: 1,
+                          '&:hover': {
+                            backgroundColor: 'rgba(56, 189, 248, 0.08)',
+                            color: '#38bdf8',
+                          },
+                          '&.Mui-selected': {
+                            backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                            color: '#38bdf8',
+                            fontWeight: 700,
+                            '&:hover': {
+                              backgroundColor: 'rgba(56, 189, 248, 0.18)',
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
                 }}
               >
-                Learn Languages with Songs
-              </Typography>
-            </Box>
+                {LANGUAGES.map((lang) => (
+                  <MenuItem key={lang} value={lang}>
+                    {lang === 'Any' ? 'Any Language' : lang}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
             {/* Settings button */}
             <Tooltip title="Configure API Key">

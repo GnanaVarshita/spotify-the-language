@@ -152,15 +152,38 @@ export async function searchVideos(query: string): Promise<PipedVideoResult[]> {
 /**
  * Fetches dynamic search recommendations by querying other songs by the same artist.
  */
-export async function getRecommendations(artist: string, currentVideoId: string): Promise<PipedVideoResult[]> {
+export async function getRecommendations(artist: string, currentVideoId: string, targetLanguageName?: string): Promise<PipedVideoResult[]> {
   if (!artist || artist === 'Unknown Artist' || artist === 'YouTube Uploader') return [];
   try {
-    const searchQuery = `${artist} songs`;
+    let searchQuery = `${artist} songs`;
+    if (targetLanguageName && targetLanguageName !== 'Any') {
+      searchQuery = `${artist} ${targetLanguageName} songs`;
+    }
     const data = await fetchFromInvidious(`/api/v1/search?q=${encodeURIComponent(searchQuery)}&filter=videos`);
-    const results = Array.isArray(data) ? data : [];
+    let results = Array.isArray(data) ? data : [];
     
+    // If we have fewer than 3 results and a target language filter is active, fetch popular songs in that language
+    const hasEnoughResults = results.filter((item: any) => item.type === 'video' && item.videoId !== currentVideoId).length >= 3;
+    if (targetLanguageName && targetLanguageName !== 'Any' && !hasEnoughResults) {
+      console.log(`Fewer than 3 recommendations for ${artist} in ${targetLanguageName}. Fetching popular fallback songs.`);
+      const fallbackQuery = `popular ${targetLanguageName} songs`;
+      const fallbackData = await fetchFromInvidious(`/api/v1/search?q=${encodeURIComponent(fallbackQuery)}&filter=videos`);
+      if (Array.isArray(fallbackData)) {
+        results = [...results, ...fallbackData];
+      }
+    }
+
+    const seen = new Set<string>();
+    seen.add(currentVideoId);
+
     return results
-      .filter((item: any) => item.type === 'video' && item.videoId !== currentVideoId)
+      .filter((item: any) => {
+        if (item.type !== 'video' || !item.videoId || seen.has(item.videoId)) {
+          return false;
+        }
+        seen.add(item.videoId);
+        return true;
+      })
       .slice(0, 6)
       .map((item: any) => {
         const videoId = item.videoId || '';
@@ -181,26 +204,51 @@ export async function getRecommendations(artist: string, currentVideoId: string)
 /**
  * Fetches recommendations using the YouTube Data API key.
  */
-export async function getYoutubeRecommendations(artist: string, currentVideoId: string, apiKey: string): Promise<PipedVideoResult[]> {
+export async function getYoutubeRecommendations(artist: string, currentVideoId: string, apiKey: string, targetLanguageName?: string): Promise<PipedVideoResult[]> {
   if (!artist || artist === 'Unknown Artist' || artist === 'YouTube Uploader') return [];
   try {
-    const searchQuery = `${artist} songs`;
+    let searchQuery = `${artist} songs`;
+    if (targetLanguageName && targetLanguageName !== 'Any') {
+      searchQuery = `${artist} ${targetLanguageName} songs`;
+    }
     const response = await fetch(
       `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(searchQuery)}&type=video&maxResults=8&key=${apiKey}`
     );
     if (!response.ok) throw new Error(`YouTube API returned status ${response.status}`);
     const data = await response.json();
-    const items = data.items || [];
+    let items = data.items || [];
     
+    // If we have fewer than 3 results and a target language filter is active, fetch popular songs in that language
+    const filteredCount = items.filter((item: any) => item.id?.videoId && item.id.videoId !== currentVideoId).length;
+    if (targetLanguageName && targetLanguageName !== 'Any' && filteredCount < 3) {
+      console.log(`Fewer than 3 YouTube recommendations for ${artist} in ${targetLanguageName}. Fetching popular fallback songs.`);
+      const fallbackQuery = `popular ${targetLanguageName} songs`;
+      const fallbackResponse = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(fallbackQuery)}&type=video&maxResults=8&key=${apiKey}`
+      );
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json();
+        if (fallbackData.items) {
+          items = [...items, ...fallbackData.items];
+        }
+      }
+    }
+
+    const seen = new Set<string>();
+    seen.add(currentVideoId);
+
     return items
-      .map((item: any) => ({
-        videoId: item.id.videoId,
-        title: item.snippet.title,
-        artist: item.snippet.channelTitle || artist,
-        thumbnailUrl: item.snippet.thumbnails?.high?.url || `https://img.youtube.com/vi/${item.id.videoId}/hqdefault.jpg`,
-        duration: 0
-      }))
-      .filter((item: any) => item.videoId !== currentVideoId)
+      .filter((item: any) => item.id?.videoId && !seen.has(item.id.videoId))
+      .map((item: any) => {
+        seen.add(item.id.videoId);
+        return {
+          videoId: item.id.videoId,
+          title: item.snippet.title,
+          artist: item.snippet.channelTitle || artist,
+          thumbnailUrl: item.snippet.thumbnails?.high?.url || `https://img.youtube.com/vi/${item.id.videoId}/hqdefault.jpg`,
+          duration: 0
+        };
+      })
       .slice(0, 6);
   } catch (err) {
     console.error('Failed to get YouTube recommendations:', err);

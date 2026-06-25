@@ -39,21 +39,23 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const [isEditing, setIsEditing] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
 
   // Find the currently active lyric line index based on playback time
   const activeIndex = lyrics.findIndex(
     (line) => currentTime >= line.startTime && currentTime <= line.endTime
   );
 
-  // Auto-scroll to center the active lyric line when activeIndex changes
+  // Auto-scroll to center the active lyric line when activeIndex changes (if enabled)
   useEffect(() => {
-    if (activeIndex !== -1 && lineRefs.current[activeIndex]) {
+    if (autoScroll && activeIndex !== -1 && lineRefs.current[activeIndex]) {
       lineRefs.current[activeIndex]?.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
       });
     }
-  }, [activeIndex]);
+  }, [activeIndex, autoScroll]);
+
 
   // Height helpers — fullscreen on mobile fills the flex overlay container
   const panelH = mobileFullscreen ? '100%' : (isBlurred ? '600px' : '520px');
@@ -158,6 +160,29 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
         </Stack>
         
         <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+          <Button 
+            size="small" 
+            variant="text" 
+            onClick={() => setAutoScroll(!autoScroll)}
+            sx={{ 
+              color: autoScroll ? '#38bdf8' : 'text.secondary',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              textTransform: 'none',
+              padding: '2px 8px',
+              border: '1px solid',
+              borderColor: autoScroll ? 'rgba(56, 189, 248, 0.25)' : 'transparent',
+              borderRadius: '4px',
+              '&:hover': {
+                color: '#38bdf8',
+                backgroundColor: 'rgba(56, 189, 248, 0.05)',
+                borderColor: 'rgba(56, 189, 248, 0.35)'
+              }
+            }}
+          >
+            {autoScroll ? 'Auto-scroll: ON' : 'Auto-scroll: OFF'}
+          </Button>
+
           <Button 
             size="small" 
             variant="text" 

@@ -48,7 +48,7 @@ export const HeroCard: React.FC = () => {
           fontSize: '1.1rem'
         }}
       >
-        Search for your favorite music videos or pick a curated song below. View synchronized lyrics and translations side-by-side. Turn on <strong>Lyrics Mode</strong> to blur the video and fully immerse yourself in vocabulary!
+        Search for your favorite music videos, view synchronized lyrics and translations side-by-side, and toggle <strong>Lyrics Mode</strong> to blur the video and fully immerse yourself in vocabulary!
       </Typography>
     </Paper>
   );
